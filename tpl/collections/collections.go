@@ -631,9 +631,11 @@ func (i *intersector) handleValuePair(l1vv, l2vv reflect.Value) {
 }
 
 // Union returns the union of the given sets, l1 and l2. l1 and
-// l2 must be of the same type and may be either arrays or slices.
-// If l1 and l2 aren't of the same type then l1 will be returned.
-// If either l1 or l2 is nil then the non-nil list will be returned.
+// l2 may be either arrays or slices. When both sides are concrete
+// numeric element types, values from l2 are converted to l1's
+// element type. Other mismatched concrete element types still
+// return an empty slice of l1's type. If either l1 or l2 is nil
+// then the non-nil list will be returned.
 func (ns *Namespace) Union(l1, l2 any) (any, error) {
 	if l1 == nil && l2 == nil {
 		return []any{}, nil
@@ -657,7 +659,11 @@ func (ns *Namespace) Union(l1, l2 any) (any, error) {
 			if l1v.Type() != l2v.Type() &&
 				l1v.Type().Elem().Kind() != reflect.Interface &&
 				l2v.Type().Elem().Kind() != reflect.Interface {
-				return ins.r.Interface(), nil
+				// Mixed concrete types: only numeric pairs can be
+				// reconciled by convertNumber below (issue 15323).
+				if !(hreflect.IsNumber(l1v.Type().Elem().Kind()) && hreflect.IsNumber(l2v.Type().Elem().Kind())) {
+					return ins.r.Interface(), nil
+				}
 			}
 
 			var (
